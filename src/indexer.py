@@ -30,6 +30,8 @@ def build_docs_from_df(df) -> list[IndexDoc]:
     for _, row in df.iterrows():
         doc_id = f"item_{int(row['item_id'])}"
 
+        ### text which can be used for semantic search for query matching
+
         text = (
             f"{row.get('item_name','')}. {row.get('description','')}. "
             f"Category: {row.get('category','')}. "
@@ -39,6 +41,9 @@ def build_docs_from_df(df) -> list[IndexDoc]:
             f"Restaurant: {row.get('restaurant_name','')}. "
             f"Location: {row.get('location','')}. "
         ).strip()
+
+        ## metadata which can be used for filtering and ranking ... 
+        # it is some sort of deterministic attributes which can be used for filtering and ranking ...
 
         metadata = {
             "item_id": _safe_int(row.get("item_id")),

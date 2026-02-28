@@ -33,10 +33,8 @@ known_restaurants = sorted(rdf["restaurant_name"].dropna().astype(str).unique().
 known_locations = sorted(rdf["location"].dropna().astype(str).unique().tolist())
 known_cuisines = sorted(rdf["cuisine_type"].dropna().astype(str).unique().tolist())
 
-st.caption("Run `python scripts/build_index.py` once before using the app (it creates the local ChromaDB index).")
-
 with st.expander("✅ Example queries", expanded=True):
-    st.code("I want a burger in 30 mins")
+    st.code("I want a butter chicken in 30 mins")
     st.code("Order something spicy veg under 250 near Mumbai")
     st.code("From Italian Delight 13 give me a mild pasta under 400")
 
@@ -55,6 +53,9 @@ if st.button("Find best items"):
         st.warning("Please enter a query.")
         st.stop()
 
+    ### Parse the query with Gemini to extract filters
+    ### something like if any known restaurant or location or cuisine is mentioned in the query, 
+    # then use it to filter the result
     with st.spinner("Parsing your query with Gemini..."):
         parsed = parse_query(
             client=gemini_client,
@@ -65,9 +66,6 @@ if st.button("Find best items"):
             known_cuisines=known_cuisines,
         )
 
-    st.subheader("🔎 Rewritten query")
-    st.write(parsed.rewritten_query)
-
     st.subheader("🧩 Extracted filters")
     st.json(parsed.filters)
 
@@ -77,7 +75,7 @@ if st.button("Find best items"):
         recs = retrieve(
             chroma_dir=settings.chroma_dir,
             collection_name=settings.collection_name,
-            query_text=parsed.rewritten_query,
+            query_text=user_query.strip(),
             filters=parsed.filters,
             top_k=top_k,
             candidate_k=max(30, top_k * 8),

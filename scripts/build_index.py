@@ -11,6 +11,9 @@ def main() -> None:
 
     root = Path(__file__).resolve().parents[1]
     data_dir = root / "data"
+
+    ## loading and joining the datasets .....
+
     restaurants_path = data_dir / "restaurants.json"
     menu_path = data_dir / "menu.json"
 
@@ -20,6 +23,8 @@ def main() -> None:
         )
 
     df = load_joined_dataset(restaurants_path, menu_path)
+
+    ### Build the “document text” (semantic searchable string)
     docs = build_docs_from_df(df)
 
     total = rebuild_collection(

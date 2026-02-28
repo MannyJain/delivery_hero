@@ -4,6 +4,8 @@ from functools import lru_cache
 from sentence_transformers import SentenceTransformer
 
 @lru_cache(maxsize=1)
+### deffault model is all-MiniLM-L6-v2 which is a small model for fast inference ...
+### with embedding length of 384 ...
 def get_embedding_model(model_name: str = "all-MiniLM-L6-v2") -> SentenceTransformer:
     return SentenceTransformer(model_name)
 

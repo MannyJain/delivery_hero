@@ -36,27 +36,34 @@ def retrieve(
     query_text: str,
     filters: dict[str, Any],
     top_k: int = 5,
-    candidate_k: int = 30,
+    candidate_k: int = 20,
     user_location: Optional[str] = None,
 ) -> list[Recommendation]:
     client = get_chroma_client(chroma_dir)
     col = client.get_or_create_collection(name=collection_name)
-
+    
+    ## after parsing the query, we need to embed the query text to get the nearest neighbor ....
     q_emb = embed_text(query_text)
-
+    
+    ## querying the vector db ....
+    ## for now top 20 candidates are returned ...
     res = col.query(
         query_embeddings=[q_emb],
         n_results=candidate_k,
         include=["metadatas", "distances"],
     )
-
+    
+    ## now we have the semantic distances for neighbors
+    ## and their metadata for further ranking .....
     metas = (res.get("metadatas") or [[]])[0]
     dists = (res.get("distances") or [[]])[0]
     if not metas:
         return []
 
     sims = [float(1.0 - d) for d in dists]  # cosine distance -> similarity
+    
 
+    ## now from the filtered candidate metadata, we need to extract the delivery time, rating and popularity ...
     delivery = [int(m.get("delivery_time_minutes", 999)) for m in metas]
     rating = [float(m.get("average_rating", 0.0)) for m in metas]
     popularity = [int(m.get("popularity_score", 0)) for m in metas]
@@ -64,7 +71,8 @@ def retrieve(
     dmin, dmax = min(delivery), max(delivery)
     rmin, rmax = min(rating), max(rating)
     pmin, pmax = min(popularity), max(popularity)
-
+    
+    ## filters are the constraints that the user has mentioned in the query ...
     max_price = filters.get("max_price")
     max_dt = filters.get("max_delivery_time_minutes")
     spice = filters.get("spice_level")
@@ -72,16 +80,20 @@ def retrieve(
     rest_name = (filters.get("restaurant_name") or "").strip().lower() or None
     loc = (filters.get("location") or "").strip().lower() or None
     cuisine = (filters.get("cuisine_type") or "").strip().lower() or None
-
+    
+    ## preparing the output list of recommendations ...
     out: list[Recommendation] = []
 
     for m, sim in zip(metas, sims):
+        ## tags are the reason tags for the recommendation ...
         tags: list[str] = []
 
         if rest_name and str(m.get("restaurant_name", "")).lower() != rest_name:
             continue
-
+        
+        ## if the user has mentioned a location in the query, then we need to check if the restaurant is in that location ...
         effective_loc = user_location or loc
+
         if effective_loc:
             if str(m.get("location", "")).lower() != effective_loc.lower():
                 continue
@@ -101,7 +113,9 @@ def retrieve(
             if str(m.get("cuisine_type", "")).lower() != cuisine.lower():
                 continue
             tags.append("cuisine_match")
-
+        
+        ## if some filters are not matching lets say price 
+        ## calculating some sort of penalty scores to rank them ...
         price = float(m.get("price", 1e9))
         budget_penalty = 0.0
         if max_price is not None and price > float(max_price):
@@ -147,6 +161,10 @@ def retrieve(
                 reason_tags=tags,
             )
         )
-
+    
+    ## sorting the recommendations based on the final score ...
+    ## higher the final score, higher the recommendation ...
+    ## final score is a hybrid score of semantic similarity, delivery time, rating and popularity ...
+    ## and some sort of penalty scores for over budget and over time ...
     out.sort(key=lambda r: r.final_score, reverse=True)
     return out[:top_k]
